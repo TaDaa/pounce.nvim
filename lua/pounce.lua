@@ -12,6 +12,11 @@ local config = {
   increase_cmd_height_if_zero = true,
 }
 
+local float_cache = {
+  active = {},
+  inactive = {}
+}
+
 local default_hl = {
   -- highlight default PounceMatch cterm=bold ctermfg=black ctermbg=green gui=bold fg=#555555 bg=#11dd11
   PounceMatch = {
@@ -222,6 +227,10 @@ function M.pounce(opts, ns)
     for _, win in ipairs(windows) do
       vim.api.nvim_buf_clear_namespace(vim.api.nvim_win_get_buf(win), ns, 0, -1)
     end
+    for _, float in ipairs(float_cache.active) do
+      table.insert(float_cache.inactive, float)
+      vim.api.nvim_win_set_config(float.win, {hide = true})
+    end
 
     -- Fake cursor highlight
     local cur_line = vim.api.nvim_get_current_line()
@@ -291,10 +300,11 @@ function M.pounce(opts, ns)
       local seen = {}
       for idx, hit in ipairs(hits) do
         local buf = vim.api.nvim_win_get_buf(hit.window)
-        -- Avoid duplication when the same buffer is visible in multiple windows.
+        -- allow duplication cuz i want it
         local seen_key = string.format("%d.%d.%d", buf, hit.line, hit.indices[1])
         if seen[seen_key] == nil then
           seen[seen_key] = true
+          -- stick a floating window on it...why not
           vim.api.nvim_buf_set_extmark(buf, ns, hit.line - 1, hit.indices[1] - 1, {
             end_col = hit.indices[#hit.indices] - 1,
             hl_group = "PounceGap",
@@ -307,25 +317,54 @@ function M.pounce(opts, ns)
               priority = hl_prio,
             })
           end
-
-          local accept_keys = opts.accept_keys
-          if idx <= accept_keys:len() then
-            local accept_key = accept_keys:sub(idx, idx)
-            accept_key_map[accept_key] = { window = hit.window, position = { hit.line, hit.indices[1] - 1 } }
-            local hl = "PounceAccept"
-            if idx == 1 and opts.accept_best_key then
-              hl = "PounceAcceptBest"
-              local key = vim.api.nvim_replace_termcodes(opts.accept_best_key, true, true, true)
-              accept_key_map[key] = accept_key_map[accept_key]
-            end
-            vim.api.nvim_buf_set_extmark(
-              buf,
-              ns,
-              hit.line - 1,
-              hit.indices[1] - 1,
-              { virt_text = { { accept_key, hl } }, virt_text_pos = "overlay" }
-            )
+        end
+        local accept_keys = opts.accept_keys
+        if idx <= accept_keys:len() then
+          local accept_key = accept_keys:sub(idx, idx)
+          accept_key_map[accept_key] = { window = hit.window, position = { hit.line, hit.indices[1] - 1 } }
+          local hl = "PounceAccept"
+          if idx == 1 and opts.accept_best_key then
+            hl = "PounceAcceptBest"
+            local key = vim.api.nvim_replace_termcodes(opts.accept_best_key, true, true, true)
+            accept_key_map[key] = accept_key_map[accept_key]
           end
+          local float
+          if #(float_cache.inactive) > 0 then
+            float = table.remove(float_cache.inactive)
+          else
+            local float_buf = vim.api.nvim_create_buf(false, true)
+            local float_win = vim.api.nvim_open_win(float_buf, false, {
+              relative = 'win',
+              width = 1,
+              height = 1,
+              row = 1,
+              bufpos = {0,0},
+              style = 'minimal',
+              anchor = 'SW',
+              hide = true,
+              fixed = true
+            })
+            float = {
+              buf = float_buf,
+              win = float_win
+            }
+            vim.api.nvim_buf_set_lines(float.buf, 0, 1, false, {' '})
+            vim.fn.matchaddpos(hl, {{1,1,1}}, 100, -1, {
+              window = float.win
+            })
+            table.insert(float_cache.active, float)
+          end
+          vim.api.nvim_buf_set_lines(float.buf, 0, 1, false, {accept_key})
+          vim.api.nvim_win_set_config(float.win, {
+            relative = 'win',
+            win = hit.window,
+            -- this is a hack to offset row by 1 and underset bufpos line by 1
+            -- this causes the correct position always
+            row = 1,
+            bufpos = {hit.line - 1, hit.indices[1] - 1},
+            hide = false,
+            fixed = true,
+          })
         end
       end
     end
@@ -372,6 +411,10 @@ function M.pounce(opts, ns)
 
   for _, win in ipairs(windows) do
     vim.api.nvim_buf_clear_namespace(vim.api.nvim_win_get_buf(win), ns, 0, -1)
+  end
+  for _, float in ipairs(float_cache.active) do
+    table.insert(float_cache.inactive, float)
+    vim.api.nvim_win_set_config(float.win, {hide = true})
   end
   vim.api.nvim_echo({}, false, {})
 
