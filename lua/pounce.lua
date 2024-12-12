@@ -100,7 +100,8 @@ local function get_windows(opts)
   local filtered_wins = {}
   for _, win in ipairs(wins) do
     -- Ignore windows we can't switch to (like Telescope).
-    if vim.api.nvim_win_get_config(win).focusable then
+    local config = vim.api.nvim_win_get_config(win)
+    if config.focusable and not config.hide then
       table.insert(filtered_wins, win)
     end
   end
@@ -120,14 +121,14 @@ local function calculate_proximity_bonus(cursor_line, cursor_col, match_line, ma
   if delta_line == 0 then
     score = score + 1.0
   end
-  score = score - math.abs(delta_line) * 1e-3
-  if delta_line < 0 then
-    score = score - 0.5e-3
-  end
-  score = score - math.abs(delta_col) * 1e-6
-  if delta_col < 0 then
-    score = score - 0.5e-6
-  end
+  -- score = score - math.abs(delta_line) * 1e-3
+  -- if delta_line < 0 then
+  --   score = score - 0.5e-3
+  -- end
+  -- score = score - math.abs(delta_col) * 1e-6
+  -- if delta_col < 0 then
+  --   score = score - 0.5e-6
+  -- end
   return score
 end
 
@@ -231,6 +232,7 @@ function M.pounce(opts, ns)
       table.insert(float_cache.inactive, float)
       vim.api.nvim_win_set_config(float.win, {hide = true})
     end
+  float_cache.active = {}
 
     -- Fake cursor highlight
     local cur_line = vim.api.nvim_get_current_line()
@@ -330,8 +332,14 @@ function M.pounce(opts, ns)
           end
           local float
           if #(float_cache.inactive) > 0 then
-            float = table.remove(float_cache.inactive)
-          else
+            while #float_cache and not float do
+              float = table.remove(float_cache.inactive)
+              if not vim.api.nvim_win_is_valid(float.win) then
+                float = nil
+              end
+            end
+          end
+          if not float then
             local float_buf = vim.api.nvim_create_buf(false, true)
             local float_win = vim.api.nvim_open_win(float_buf, false, {
               relative = 'win',
@@ -342,6 +350,7 @@ function M.pounce(opts, ns)
               style = 'minimal',
               anchor = 'SW',
               hide = true,
+              focusable = false,
               fixed = true
             })
             float = {
@@ -352,8 +361,8 @@ function M.pounce(opts, ns)
             vim.fn.matchaddpos(hl, {{1,1,1}}, 100, -1, {
               window = float.win
             })
-            table.insert(float_cache.active, float)
           end
+          table.insert(float_cache.active, float)
           vim.api.nvim_buf_set_lines(float.buf, 0, 1, false, {accept_key})
           vim.api.nvim_win_set_config(float.win, {
             relative = 'win',
@@ -416,6 +425,7 @@ function M.pounce(opts, ns)
     table.insert(float_cache.inactive, float)
     vim.api.nvim_win_set_config(float.win, {hide = true})
   end
+  float_cache.active = {}
   vim.api.nvim_echo({}, false, {})
 
   if vim.o.cmdheight ~= old_cmdheight then

@@ -48,9 +48,9 @@ function M.filter(hits)
 
   local filtered_hits = {}
   for _, hit in ipairs(hits) do
-    if hit.score > best_score / 2 then
+    -- if hit.score > best_score / 2 then
       table.insert(filtered_hits, hit)
-    end
+    -- end
   end
   return filtered_hits
 end
