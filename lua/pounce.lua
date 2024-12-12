@@ -283,7 +283,8 @@ function M.pounce(opts, ns)
               local col = m.indices[1] - 1
               score = score + calculate_proximity_bonus(cursor_line, cursor_col, line, col)
             end
-            score = score + #hits * 1e-9 -- stabilize sort
+            -- why should the number of hits in a window determine order -- I don't want that
+            -- score = score + #hits * 1e-9 -- stabilize sort
             table.insert(hits, { window = win, line = line, indices = m.indices, score = score })
             if opts.debug then
               vim.api.nvim_buf_set_extmark(buf, ns, line - 1, -1, { virt_text = { { tostring(score), "IncSearch" } } })
