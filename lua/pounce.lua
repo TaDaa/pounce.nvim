@@ -229,8 +229,9 @@ function M.pounce(opts, ns)
       vim.api.nvim_buf_clear_namespace(vim.api.nvim_win_get_buf(win), ns, 0, -1)
     end
     for _, float in ipairs(float_cache.active) do
-      table.insert(float_cache.inactive, float)
-      vim.api.nvim_win_set_config(float.win, {hide = true})
+      -- table.insert(float_cache.inactive, float)
+      -- vim.api.nvim_win_set_config(float.win, {hide = true})
+      vim.api.nvim_win_close(float.win, true)
     end
   float_cache.active = {}
 
@@ -422,8 +423,9 @@ function M.pounce(opts, ns)
     vim.api.nvim_buf_clear_namespace(vim.api.nvim_win_get_buf(win), ns, 0, -1)
   end
   for _, float in ipairs(float_cache.active) do
-    table.insert(float_cache.inactive, float)
-    vim.api.nvim_win_set_config(float.win, {hide = true})
+    -- table.insert(float_cache.inactive, float)
+    -- vim.api.nvim_win_set_config(float.win, {hide = true})
+    vim.api.nvim_win_close(float.win, true)
   end
   float_cache.active = {}
   vim.api.nvim_echo({}, false, {})
